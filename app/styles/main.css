@@ -1,0 +1,87 @@
+html, body {
+  height: 100%;
+  font-size: 12px;
+}
+        
+.no-scroll{
+  padding-right: 0!important;
+}
+
+.app {
+  position: relative;
+  height: 100%;
+}
+
+.app__header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  border-bottom: 1px solid #dee5e7;
+  line-height: 38px;
+  padding-left: 10px;
+  font-size: 12px;
+}
+
+.app__body {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+}
+
+.app__left {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 200px;
+  bottom: 0;
+  border-right: 1px solid #dee5e7;
+}
+
+.app__left.fixed {
+  right: auto;
+  width: 200px;
+}
+
+.app__right {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 200px;
+  bottom: 0;
+}
+
+.app__right.fixed {
+  width: 200px;
+  left: auto;
+}
+
+.task {
+
+}
+
+.task__item {
+  margin: 5px 5px;
+  line-height: 30px;
+  padding: 0 10px;
+  background-color: #fff;
+  border: 1px solid #eee;
+  transition: all .3s ease-out;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.task__item.active {
+  background-color: ##1d976c;
+}
+
+.task__item:hover {
+  background-color: #edf1f2;
+}
