@@ -1,0 +1,1 @@
+node host/fecommand-native-messaging.js

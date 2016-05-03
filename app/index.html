@@ -10,60 +10,147 @@
   <script src="scripts/jquery-1.10.2.min.js"></script>
   <script type="text/javascript"  src="scripts/vue-v1.0.12.js"></script>
   <script type="text/javascript"  src="scripts/vue-strap.min.js"></script>
+  <script type="text/javascript"  src="scripts/lodash.js"></script>
 </head>
 <body>
   <div id="app" class="app">
-    <div class="app__left">
-      <div class="app__header">
-        <img src="images/icon.png"/>
-        前端命令工具
-        <button v-on:click="open" class="btn btn-default btn-sm pull-right" style="margin-top: 4px; margin-right: 10px;">添加项目</button>
-        <div class="btn-group" style="margin-left: 30px;">
-          <button class="btn btn-default btn-sm" v-for="project in projects">{{project.name}}</button>
-        </div>
+    <div class="app__header">
+      <img src="images/icon.png"/>
+      前端命令工具
+      <div class="btn-group pull-right" style="margin: 4px 10px 0 0;">
+        <button v-on:click="open" class="btn btn-default btn-sm">
+          <tooltip content="添加新的项目" placement="bottom">
+            <i class="glyphicon glyphicon-plus"></i>
+          </tooltip>
+        </button>
+        <button class="btn btn-default btn-sm" v-on:click="openSettings">
+          <tooltip content="设置" placement="bottom">
+            <i class="glyphicon glyphicon-cog"></i>
+          </tooltip>
+        </button>
+        <button class="btn btn-default btn-sm" v-on:click="openHelp">
+          <tooltip content="帮助" placement="bottom">
+            <i class="glyphicon glyphicon-question-sign"></i>
+          </tooltip>
+        </button>
       </div>
-      <div class="app__body">
-        <div class="app__left fixed">
-          <div class="app__header">任务列表
-            <button v-on:click="open" class="btn btn-default btn-sm pull-right" style="margin-top: 4px; margin-right: 10px;">修改项目</button>
-          </div>
-          <div class="app__body">
-            <div class="task__item" v-for="task in currentProject.tasks">{{task.name}}</div>
-          </div>
-        </div>
-        <div class="app__right">
-          <div class="app__header"><b>输 出</b></div>
-          <div class="app__body"></div>
-        </div>
+      <div class="btn-group" style="margin-left: 30px;">
+        <button class="btn btn-default btn-sm" v-bind:class="{ 'btn-primary' : project === currentProject}" v-on:click="selectProject(project)" v-for="project in projects">{{project.name}}</button>
       </div>
     </div>
-    <div class="app__right fixed">
-      <div class="app__header">正在运行</div>
-      <div class="app__body">
-        <div class="task__item" v-for="item in backgroundTasks">{{item.name}}
-          <button class="btn btn-danger btn-xs pull-right" style="margin-top: 4px;">
-            <i class="glyphicon glyphicon-remove"></i>
+    <div class="app__body">
+      <div class="app__left fixed">
+        <div class="app__header">{{currentProject.name}}的任务列表
+          <button v-on:click="open('edit')" class="btn btn-default btn-sm pull-right" style="margin-top: 4px; margin-right: 10px;">
+            <tooltip content="编辑项目" placement="bottom">
+              <i class="glyphicon glyphicon-pencil"></i>
+            </tooltip>
           </button>
         </div>
+        <div class="app__body">
+          <div class="task__item" v-if="currentProject.tasks" v-for="task in currentProject.tasks" v-on:click="runCustomTask(task)">{{task}}</div>
+          <div class="task__group" v-for="group in taskMap[currentProject.name]">
+            <div class="task__title">{{group.name}}</div>
+            <div class="task__item" v-on:click="runTask(group.name, task)" v-for="task in group.list">{{task}}</div>
+          </div>
+        </div>
+      </div>
+      <div class="app__right">
+        <div class="app__header tab">
+          <div class="tab__item" v-bind:class="{ active: currentTask === task }" v-on:click="selectTask(task)" v-for="task in backgroundTasks" title="{{task.projectName}} > {{task.fullCmd}}">
+            {{task.fullCmd}}
+          </div>
+        </div>
+        <div class="app__body">
+          <div class="app__prompt" v-show="!backgroundTasks.length">
+            <div>点击左边任务列表项运行任务
+            </div>
+          </div>
+          <div class="task__tools" v-show="backgroundTasks.length">
+            <button class="btn btn-danger btn-xs" v-show="currentTask.status === 'running'" v-on:click="kill">杀掉进程</button>
+            <button class="btn btn-success btn-xs" v-show="currentTask.status && currentTask.status !== 'running'" v-on:click="rerun(currentTask)">重新运行</button>
+            <button class="btn btn-default btn-xs" v-show="currentTask.status && currentTask.status !== 'running'" v-on:click="closeTask(currentTask)">关闭</button>
+          </div>
+          <div class="message">
+            <pre v-for="message in currentTask.messages" track-by="$index">{{message}}</pre>
+          </div>
+        </div>
       </div>
     </div>
-    <modal :show.sync="opening" effect="fade" :width="400">
+    <modal :show.sync="opening" effect="fade" :width="auto">
       <div slot="modal-header" class="modal-header">
         <button type="button" class="close" v-on:click="close"><span aria-hidden="true">&times;</span></button>
         <h4 class="modal-title">项目信息</h4>
       </div>
       <div slot="modal-body" class="modal-body">
-
+        <form class="form-horizontal" v-on:sumbit.prevent="confirm">
+          <div class="form-group">
+            <label for="name" class="col-sm-2 control-label">项目名称</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="name" name="name" v-model="currentEditProject.name" placeholder="请输入项目名称">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="dir" class="col-sm-2 control-label">项目目录</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" id="dir" name="dir" v-model="currentEditProject.dir" placeholder="请填写项目目录">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="task" class="col-sm-2 control-label">自定义任务</label>
+            <div class="col-sm-10">
+              <div class="task__item static" v-if="currentEditProject.tasks" track-by="$index" v-for="task in currentEditProject.tasks">
+                {{task}}
+                <button type="button" class="btn btn-danger pull-right btn-xs" v-on:click="removeCustomTask($index)">删除</button>
+              </div>
+              <div class="input-group">
+                <input type="text" class="form-control input-sm" id="task" name="task" v-model="tempTask" placeholder="请填写需要运行的命令，如：npm install -d">
+                <span class="input-group-btn">
+                  <button type="button" class="btn btn-default btn-sm" v-on:click="addCustomTask" title="添加自定义任务">
+                    <i class="glyphicon glyphicon-plus"></i>
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
       <div slot="modal-footer" class="modal-footer">
+        <button type="button" class="btn btn-danger btn-sm pull-left" v-show="openType === 'edit'" v-on:click="removeProject">移除项目</button>
         <button type="button" class="btn btn-default btn-sm" v-on:click="close">取消</button>
         <button type="submit" class="btn btn-primary btn-sm" v-on:click="confirm">确认</button>
+      </div>
+    </modal>
+    <modal :show.sync="helpOpening" effect="fade" :width="auto">
+      <div slot="modal-header" class="modal-header">
+        <button type="button" class="close" v-on:click="closeHelp"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">帮助</h4>
+      </div>
+      <div slot="modal-body" class="modal-body">
+        
+      </div>
+      <div slot="modal-footer" class="modal-footer">
+        <button type="button" class="btn btn-default btn-sm" v-on:click="closeHelp">关闭</button>
+      </div>
+    </modal>
+    <modal :show.sync="settingsOpening" effect="fade" :width="auto">
+      <div slot="modal-header" class="modal-header">
+        <button type="button" class="close" v-on:click="closeSettings"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">设置</h4>
+      </div>
+      <div slot="modal-body" class="modal-body">
+        
+      </div>
+      <div slot="modal-footer" class="modal-footer">
+        <button type="button" class="btn btn-default btn-sm" v-on:click="closeSettings">关闭</button>
+        <button type="submit" class="btn btn-primary btn-sm" v-on:click="saveSettings">保存</button>
       </div>
     </modal>
   </div>
   <script type="text/x-template" id="background">
     
   </script>
+  <script src="util.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

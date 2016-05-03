@@ -1,0 +1,9 @@
+{
+  "name": "com.colorbox.fecommand",
+  "description": "a native nodejs server for fecommand chrome extension",
+  "path": "HOST_PATH",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://bfhmhkhcdgaodijpfpkaeimbcbommfgc/"
+  ]
+}
