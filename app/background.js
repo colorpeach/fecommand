@@ -1,44 +1,122 @@
+var nmInited = false; // native host是否已经初始化完成
+var isConnected = false; // 是否已经启动了native host
+// native messaging单例
+var nm = function () {
+  var application = 'com.colorbox.fecommand';
+  var nativePort = null;
+  var r = {};
+  var _events = [];
 
-// var application = 'com.colorbox.fecommand';
-// var ports = [];
+  r.emit = function (data) {
+    if (!nativePort) {
+      r.connect();
+    }
+    return nativePort.postMessage(data);
+  };
 
-// chrome.runtime.onConnect.addListener(function(port) {
-//     if (port.name !== "fecommand") return;
+  r.on = function (fn) {
+    _events.push(fn);
+  };
 
-//     // 连接native messaging host
-//     var nativePort = chrome.runtime.connectNative(application);
+  r.off = function (fn) {
+    for (var i = 0; i < _events.length; i++) {
+      if (fn === _events[i]) {
+        _events.splice(i, 1);
+      }
+    }
+  };
 
-//     ports.push(port);
-//     // Remove port when destroyed (eg when devtools instance is closed)
-//     port.onDisconnect.addListener(function() {
-//         var i = ports.indexOf(port);
-//         if (i !== -1) ports.splice(i, 1);
-//     });
-//     port.onMessage.addListener(function(msg) {
-//         // Received message from devtools.
-//         // console.log('Received message from devtools page', msg);
-//           // 启动本地nodejs socket服务器
-//           chrome.runtime.sendNativeMessage(application, JSON.parse(msg), function (message) {
-//             if (message) {
-//               notifyDevtools(message);
-//             } else {
-//               notifyDevtools('disconnect native messaging:' + chrome.runtime.lastError.message);
-//             }
-//           });
-//     });
+  r.connect = function () {
+    if (nativePort) { return; }
 
-//     nativePort.onDisconnect.addListener(function () {
-//       notifyDevtools('disconnect native messaging:' + chrome.runtime.lastError.message)
-//     });
-//     nativePort.onMessage.addListener(notifyDevtools);
+    nativePort = chrome.runtime.connectNative(application);
 
-//     notifyDevtools('native messaging start');
-// });
+    nativePort.onMessage.addListener(function (msg) {
+      if (msg.event === 'nativeError') {
+        nativePort = null;
+        nmInited = isConnected = false;
+      }
 
-// // Function to send a message to all devtools.html views:
-// function notifyDevtools(msg) {
-//   var str = JSON.stringify(msg);
-//     ports.forEach(function(port) {
-//         port.postMessage(str);
-//     });
-// }
+      if (msg.event === 'mpInit') {
+        // 通知没有初始化的devtools初始化
+        nmInited = true;
+        ports.forEach(function (port) {
+          port.postMessage({ event: 'portInited' });
+        });
+        return;
+      }
+      _events.forEach(function (item) {
+        item(msg);
+      });
+    });
+
+    nativePort.onDisconnect.addListener(function () {
+      nativePort = null;
+      nmInited = isConnected = false;
+      _events.forEach(function (item) {
+        item({ event: 'error', data: chrome.runtime.lastError.message});
+      });
+    });
+
+    isConnected = true;
+  };
+
+  return r;
+}();
+
+var ports = [];
+var priviteMessages = ['init']; // 不需要广播的任务名称
+var portId = 1;
+
+// devtools连接到这里
+chrome.runtime.onConnect.addListener(function(port) {
+  if (port.name !== "fecommand") return;
+
+  var id = portId++;
+  var onNativeMessage = function (msg) {
+    if (priviteMessages.indexOf(msg.event) > -1 && msg.portId === id) {
+      port.postMessage(msg);
+    }
+  };
+
+  ports.push(port);
+
+  // 连接断开时，将对应的devtools端口删除
+  port.onDisconnect.addListener(function() {
+    for (var i = 0; i < ports.length; i++) {
+      if (port === ports[i]) {
+        ports.splice(i, 1);
+        break;
+      }
+    }
+    nm.off(onNativeMessage);
+    port = null;
+    onNativeMessage = null;
+  });
+
+  port.onMessage.addListener(function(msg) {
+    // 接收devtools发来的信息
+    msg.portId = id;
+    nm.emit(msg);
+  });
+
+  if (!isConnected) {
+    // 如果native host还没有启动，需要启动native host
+    nm.connect();
+  }
+
+  if (nmInited) {
+    port.postMessage({ event: 'portInited' });
+  }
+
+  nm.on(onNativeMessage);
+});
+
+// 接收native host发来的消息，转发给devtools
+nm.on(function (msg) {
+  if (priviteMessages.indexOf(msg.event) < 0) {
+    ports.forEach(function(port) {
+      port.postMessage(msg);
+    });
+  }
+});

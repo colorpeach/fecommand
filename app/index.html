@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Frontend-Devtools</title>
+  <title>前端任务工具</title>
   <link href="scripts/bootstrap/css/bootstrap.css" rel="stylesheet" type="text/css"/>
   <link href="scripts/cover-bootstrap/cover-bootstrap.css" rel="stylesheet" type="text/css"/>
   <link href="styles/main.css" rel="stylesheet" type="text/css"/>
@@ -14,11 +14,12 @@
 </head>
 <body>
   <div id="app" class="app">
+    <div class="app__mask" v-show="loaded"></div>
     <div class="app__header">
       <img src="images/icon.png"/>
-      前端命令工具
-      <div class="btn-group pull-right" style="margin: 4px 10px 0 0;">
-        <button v-on:click="open" class="btn btn-default btn-sm">
+      前端任务工具
+      <div class="btn-group app__rightbtn">
+        <button v-on:click="openUpdateProject" class="btn btn-default btn-sm">
           <tooltip content="添加新的项目" placement="bottom">
             <i class="glyphicon glyphicon-plus"></i>
           </tooltip>
@@ -41,37 +42,37 @@
     <div class="app__body">
       <div class="app__left fixed">
         <div class="app__header">{{currentProject.name}}的任务列表
-          <button v-on:click="open('edit')" class="btn btn-default btn-sm pull-right" style="margin-top: 4px; margin-right: 10px;">
+          <button v-on:click="openUpdateProject('edit')" class="btn btn-default btn-sm app__rightbtn">
             <tooltip content="编辑项目" placement="bottom">
               <i class="glyphicon glyphicon-pencil"></i>
             </tooltip>
           </button>
         </div>
         <div class="app__body">
-          <div class="task__item" v-if="currentProject.tasks" v-for="task in currentProject.tasks" v-on:click="runCustomTask(task)">{{task}}</div>
-          <div class="task__group" v-for="group in taskMap[currentProject.name]">
+          <div class="task__item" v-if="currentProject.tasks" v-for="task in currentProject.tasks" v-on:click="addOpeningTask(task)">{{task}}</div>
+          <div class="task__group" v-for="group in taskMap[currentProject.id]">
             <div class="task__title">{{group.name}}</div>
-            <div class="task__item" v-on:click="runTask(group.name, task)" v-for="task in group.list">{{task}}</div>
+            <div class="task__item" v-on:click="addOpeningTask(group.name + ' ' + task)" v-for="task in group.list">{{task}}</div>
           </div>
         </div>
       </div>
       <div class="app__right">
         <div class="app__header tab">
-          <div class="tab__item" v-bind:class="{ active: currentTask === task }" v-on:click="selectTask(task)" v-for="task in backgroundTasks" title="{{task.projectName}} > {{task.fullCmd}}">
-            {{task.fullCmd}}
+          <div class="tab__item" v-bind:class="{ active: currentTask === task }" v-on:click="selectTask(task)" v-for="task in openingTasks" title="{{task.project.name}} > {{task.cmd}}">
+            {{task.cmd}}
           </div>
         </div>
         <div class="app__body">
-          <div class="app__prompt" v-show="!backgroundTasks.length">
+          <div class="app__prompt" v-show="!openingTasks.length">
             <div>点击左边任务列表项运行任务
             </div>
           </div>
-          <div class="task__tools" v-show="backgroundTasks.length">
-            <button class="btn btn-danger btn-xs" v-show="currentTask.status === 'running'" v-on:click="kill">杀掉进程</button>
-            <button class="btn btn-success btn-xs" v-show="currentTask.status && currentTask.status !== 'running'" v-on:click="rerun(currentTask)">重新运行</button>
-            <button class="btn btn-default btn-xs" v-show="currentTask.status && currentTask.status !== 'running'" v-on:click="closeTask(currentTask)">关闭</button>
+          <div class="task__tools" v-show="openingTasks.length">
+            <button class="btn btn-danger btn-xs" v-show="currentTask.status === 'running' || currentTask.status === 'error'" v-on:click="killTask(currentTask.pid)">杀掉进程</button>
+            <button class="btn btn-success btn-xs" v-show="currentTask.status && currentTask.status !== 'running' && currentTask.status !== 'error'" v-on:click="runTask(currentTask.id)">重新运行</button>
+            <button class="btn btn-default btn-xs" v-on:click="closeOpeningTask(currentTask.id)">关闭</button>
           </div>
-          <div class="message">
+          <div class="message" v-scroll-fixed="currentTask.messages.length">
             <pre v-for="message in currentTask.messages" track-by="$index">{{message}}</pre>
           </div>
         </div>
@@ -79,7 +80,7 @@
     </div>
     <modal :show.sync="opening" effect="fade" :width="auto">
       <div slot="modal-header" class="modal-header">
-        <button type="button" class="close" v-on:click="close"><span aria-hidden="true">&times;</span></button>
+        <button type="button" class="close" v-on:click="closeUpdateProject"><span aria-hidden="true">&times;</span></button>
         <h4 class="modal-title">项目信息</h4>
       </div>
       <div slot="modal-body" class="modal-body">
@@ -117,8 +118,8 @@
       </div>
       <div slot="modal-footer" class="modal-footer">
         <button type="button" class="btn btn-danger btn-sm pull-left" v-show="openType === 'edit'" v-on:click="removeProject">移除项目</button>
-        <button type="button" class="btn btn-default btn-sm" v-on:click="close">取消</button>
-        <button type="submit" class="btn btn-primary btn-sm" v-on:click="confirm">确认</button>
+        <button type="button" class="btn btn-default btn-sm" v-on:click="closeUpdateProject">取消</button>
+        <button type="submit" class="btn btn-primary btn-sm" v-on:click="saveProject">确认</button>
       </div>
     </modal>
     <modal :show.sync="helpOpening" effect="fade" :width="auto">
@@ -146,9 +147,17 @@
         <button type="submit" class="btn btn-primary btn-sm" v-on:click="saveSettings">保存</button>
       </div>
     </modal>
+    <alert v-ref:alert></alert>
   </div>
-  <script type="text/x-template" id="background">
-    
+  <script type="text/x-template" id="alert">
+    <div v-show="alerts.length" transition="alert-group" class="alert-group">
+      <div v-for="alert in alerts" transition="alert" class="alert-wrap">
+        <div :class="alert.type ? ('alert-' + alert.type) : ''" class="alert">
+          <button @click="close(alert.id)" class="close"><span>&times;</span></button><strong>{{alert.title}}</strong>
+          <p>{{{alert.body}}}</p>
+        </div>
+      </div>
+    </div>
   </script>
   <script src="util.js"></script>
   <script src="app.js"></script>
