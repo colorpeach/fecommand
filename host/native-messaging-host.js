@@ -6,6 +6,7 @@ var fs = require("fs");
 var spawn = require('child_process').spawn;
 var path = require("path");
 var EventEmitter = require('events').EventEmitter;
+var workers = [];
 
 function find (list, key, value) {
   for (var i = 0; i < list.length; i++) {
@@ -118,7 +119,7 @@ function initProject (project) {
 function spawnTask (id, api) {
   var task = find(openingTasks, 'id', id);
   var cmd = task.cmd.split(' ');
-  var worker = spawn(cmd[0], cmd.slice(1), { cwd: task.project.dir, env: { PATH: process.env.PATH + ':/usr/local/bin' }});
+  var worker = spawn(cmd[0], cmd.slice(1), { cwd: task.project.dir, detached: true, env: { PATH: process.env.PATH + ':/usr/local/bin' }});
   var passData = {
     id: task.id,
     pid: worker.pid,
@@ -285,6 +286,7 @@ process.stdin.on('readable', function() {
 
 // 退出时，通知背景页
 process.on('exit', function (code) {
+
   api.emit('nativeError', { code: code });
 });
 
