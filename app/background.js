@@ -32,6 +32,7 @@ var nm = function () {
     nativePort = chrome.runtime.connectNative(application);
 
     nativePort.onMessage.addListener(function (msg) {
+      console.log('from native: ', msg);
       if (msg.event === 'nativeError') {
         nativePort = null;
         nmInited = isConnected = false;
@@ -98,6 +99,7 @@ chrome.runtime.onConnect.addListener(function(port) {
     // 接收devtools发来的信息
     msg.portId = id;
     nm.emit(msg);
+    console.log('from devtools: ', msg);
   });
 
   if (!isConnected) {

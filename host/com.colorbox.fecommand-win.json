@@ -1,7 +1,10 @@
+// Copyright 2013 The Chromium Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 {
   "name": "com.colorbox.fecommand",
   "description": "a native nodejs server for fecommand chrome extension",
-  "path": "HOST_PATH",
+  "path": "native-messaging-host.bat",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://bfhmhkhcdgaodijpfpkaeimbcbommfgc/",

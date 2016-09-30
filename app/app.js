@@ -9,6 +9,8 @@ new Vue({
       vm.loaded = true;
       
       mp.on('portInited', function () {
+        vm.connect = true;
+
         // 初始化项目
         mp.emit('pageInit', {
           projects: store.get('projects') || [],
@@ -20,7 +22,6 @@ new Vue({
           vm.projects = data.projects;
           vm.openingTasks = data.openingTasks;
           vm.taskMap = data.taskMap;
-          vm.currentProject = vm.projects[0] || {};
           vm.currentTask = vm.openingTasks[0] || {};
         });
 
@@ -33,7 +34,6 @@ new Vue({
         mp.on('onProjectChange', function (data) {
           switch (data.type) {
             case 'add':
-              vm.projects.length || (vm.currentProject = data.project);
               vm.projects.push(data.project);
             break;
             case 'update':
@@ -41,7 +41,6 @@ new Vue({
             break;
             case 'remove':
               var i = remove(vm.projects, 'id', data.project.id);
-              vm.currentProject = vm.projects[--i < 0 ? 0 : i] || {};
             break;
           }
           store.set('projects', vm.projects);
@@ -71,9 +70,11 @@ new Vue({
         mp.on('onProcessExit', addMessage);
         mp.on('error', function (error) {
           vm.$alert('danger', '错误', error);
+          vm.connect = false;
         });
         mp.on('nativeError', function (error) {
           vm.$alert('danger', '本地错误', error);
+          vm.connect = false;
         });
       });
     }
@@ -107,9 +108,9 @@ new Vue({
     tooltip: VueStrap.tooltip
   },
   data: {
+    connect: false,
     projects: [], // 项目列表
     openingTasks: [], // 打开的任务
-    currentProject: {}, // 当前选中的项目
     currentEditProject: {}, // 正在编辑的项目
     opening: false, // 打开项目信息编辑弹窗的标志位
     openType: 'add', // 打开弹窗的类型
@@ -130,12 +131,12 @@ new Vue({
     } // 设置
   },
   methods: {
-    openUpdateProject: function (type) {
+    openUpdateProject: function (type, project) {
       this.opening = true;
       this.openType = type || 'add';
 
       if (this.openType === 'edit') {
-        this.currentEditProject = $.extend({}, this.currentProject);
+        this.currentEditProject = $.extend({}, project);
       } else {
         this.currentEditProject = {};
         this.currentEditProject.tasks = [];
@@ -157,13 +158,9 @@ new Vue({
     },
     // 移除项目
     removeProject: function () {
-      mp.emit('projectChange', { type: 'remove', project: this.currentProject });
+      mp.emit('projectChange', { type: 'remove', project: this.currentEditProject });
 
       this.closeUpdateProject();
-    },
-    // 选择项目
-    selectProject: function (project) {
-      this.currentProject = project;
     },
     // 添加自定义任务
     addCustomTask: function () {
@@ -179,14 +176,14 @@ new Vue({
       this.currentTask = task;
     },
     // 打开任务
-    addOpeningTask: function (cmd) {
+    addOpeningTask: function (project, cmd) {
       const id = new Date().getTime();
 
       mp.emit('openingTaskChange', {
         type: 'add',
         pageId: this.pageId,
         openingTask: { 
-          project: this.currentProject,
+          project: project,
           id: id,
           cmd: cmd,
           status: 'running',

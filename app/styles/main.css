@@ -2,7 +2,28 @@ html, body {
   height: 100%;
   font-size: 12px;
 }
-        
+
+/*定义滚动条高宽及背景 高宽分别对应横竖滚动条的尺寸*/
+::-webkit-scrollbar {
+	width: 4px;
+	height: 4px;
+}
+ 
+/*定义滚动条轨道 内阴影+圆角*/
+::-webkit-scrollbar-track {
+    background-color: #F5F5F5;
+}
+
+/* 垂直滚动条的滑动块 */
+::-webkit-scrollbar-thumb:vertical {
+    height: 30px;
+	background-color: rgba(0, 0, 0, .2);
+}
+
+body {
+  font-family: "Microsoft YaHei";
+}
+
 .no-scroll{
   padding-right: 0!important;
 }
@@ -22,6 +43,11 @@ html, body {
   line-height: 38px;
   padding-left: 10px;
   font-size: 12px;
+}
+
+.app__status {
+  font-size: 12px;
+  margin-left: 5px;
 }
 
 .app__body {
@@ -110,6 +136,7 @@ html, body {
 }
 
 .task__title {
+  position: relative;
   line-height: 30px;
   padding: 0 10px;
   background-color: #eee;
@@ -171,6 +198,7 @@ html, body {
 
 .tab__item.active {
   background-color: #dee5e7;
+  cursor: default;
 }
 
 .message {

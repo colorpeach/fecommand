@@ -18,6 +18,8 @@
     <div class="app__header">
       <img src="images/icon.png"/>
       前端任务工具
+      <span class="label label-success app__status" v-if="connect">已连接</span>
+      <span class="label label-danger app__status" v-if="!connect">未连接</span>
       <div class="btn-group app__rightbtn">
         <button v-on:click="openUpdateProject" class="btn btn-default btn-sm">
           <tooltip content="添加新的项目" placement="bottom">
@@ -35,24 +37,24 @@
           </tooltip>
         </button>
       </div>
-      <div class="btn-group" style="margin-left: 30px;">
-        <button class="btn btn-default btn-sm" v-bind:class="{ 'btn-primary' : project === currentProject}" v-on:click="selectProject(project)" v-for="project in projects">{{project.name}}</button>
-      </div>
     </div>
     <div class="app__body">
       <div class="app__left fixed">
-        <div class="app__header">{{currentProject.name}}的任务列表
-          <button v-on:click="openUpdateProject('edit')" class="btn btn-default btn-sm app__rightbtn">
-            <tooltip content="编辑项目" placement="bottom">
-              <i class="glyphicon glyphicon-pencil"></i>
-            </tooltip>
-          </button>
-        </div>
+        <div class="app__header">任务列表</div>
         <div class="app__body">
-          <div class="task__item" v-if="currentProject.tasks" v-for="task in currentProject.tasks" v-on:click="addOpeningTask(task)">{{task}}</div>
-          <div class="task__group" v-for="group in taskMap[currentProject.id]">
-            <div class="task__title">{{group.name}}</div>
-            <div class="task__item" v-on:click="addOpeningTask(group.name + ' ' + task)" v-for="task in group.list">{{task}}</div>
+          <div class="task__group" v-for="project in projects">
+            <div class="task__title">
+              <b>{{project.name}}</b>
+              <button v-on:click="openUpdateProject('edit', project)" class="btn btn-default btn-xs app__rightbtn">
+                <tooltip content="编辑项目" placement="left">
+                  <i class="glyphicon glyphicon-pencil"></i>
+                </tooltip>
+              </button>
+            </div>
+            <div class="task__item" v-if="project.tasks" v-for="task in project.tasks" v-on:click="addOpeningTask(project, task)">{{task}}</div>
+            <template v-for="group in taskMap[project.id]">
+              <div class="task__item" v-on:click="addOpeningTask(project, group.name + ' ' + task)" v-for="task in group.list">{{group.name + ' ' + task}}</div>
+            </template>
           </div>
         </div>
       </div>

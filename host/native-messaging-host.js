@@ -4,6 +4,7 @@
 var http = require("http");
 var fs = require("fs");
 var spawn = require('child_process').spawn;
+var exec = require('child_process').exec;
 var path = require("path");
 var EventEmitter = require('events').EventEmitter;
 var workers = [];
@@ -119,7 +120,10 @@ function initProject (project) {
 function spawnTask (id, api) {
   var task = find(openingTasks, 'id', id);
   var cmd = task.cmd.split(' ');
-  var worker = spawn(cmd[0], cmd.slice(1), { cwd: task.project.dir, detached: true, env: { PATH: process.env.PATH + ':/usr/local/bin' }});
+  var spawnCmd = cmd[0] + ((process.platform === 'win32') ? '.cmd' : '');
+  var options = { cwd: task.project.dir };
+  process.platform !== 'win32' && (options.env = { PATH: process.env.PATH + ':/usr/local/bin' }, options.detached = true);
+  var worker = spawn(spawnCmd, cmd.slice(1), options);
   var passData = {
     id: task.id,
     pid: worker.pid,
@@ -273,11 +277,17 @@ api.on('run', function (data) {
 api.on('kill', function (data) {
   // 杀掉进程组
   // http://azimi.me/2014/12/31/kill-child_process-node-js.html
-  try {
-    if (!process.kill(data.pid)) {
-      process.kill(-data.pid);
-    }
-  } catch (e) {}
+  if (process.platform === 'win32') {
+    try {
+		exec('taskkill /pid ' + data.pid + ' /T /F');
+    } catch (e) {}
+  } else {
+    try {
+      if (!process.kill(data.pid)) {
+        process.kill(-data.pid);
+      }
+    } catch (e) {}
+  }
 });
 
 process.stdin.on('readable', function() {
@@ -286,7 +296,13 @@ process.stdin.on('readable', function() {
 
 // 退出时，通知背景页
 process.on('exit', function (code) {
-
+  openingTasks.forEach(function (task) {
+    try {
+      if (!process.kill(task.pid)) {
+        process.kill(-task.pid);
+      }
+    } catch (e) {}
+  });
   api.emit('nativeError', { code: code });
 });
 
