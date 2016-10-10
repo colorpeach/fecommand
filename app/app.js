@@ -14,15 +14,16 @@ new Vue({
         // 初始化项目
         mp.emit('pageInit', {
           projects: store.get('projects') || [],
-          openingTasks: store.get('openingTasks') || []
+          openingTasks: store.get('openingTasks') || [],
+          settings: vm.settings
         });
 
         // 数据就绪，开始初始化
         mp.on('init', function (data) {
-          vm.projects = data.projects;
-          vm.openingTasks = data.openingTasks;
-          vm.taskMap = data.taskMap;
-          vm.currentTask = vm.openingTasks[0] || {};
+          vm.$set('projects', data.projects);
+          vm.$set('openingTasks', data.openingTasks);
+          vm.$set('taskMap', data.taskMap);
+          vm.$set('currentTask', data.openingTasks[0] || {});
         });
 
         // 加载项目的任务列表
@@ -64,6 +65,11 @@ new Vue({
           store.set('openingTasks', vm.openingTasks);
         });
 
+        mp.on('onProcessStart', function (data) {
+          // 任务启动时，清除掉之前的日志
+          _.find(vm.openingTasks, { id: data.id }).messages = [];
+        });
+
         mp.on('onProcessRunning', addMessage);
         mp.on('onProcessFinish', addMessage);
         mp.on('onProcessError', addMessage);
@@ -85,10 +91,10 @@ new Vue({
 
       task.pid = data.pid;
       task.status = data.status;
-      task.messages.push(data.message);
+      task.messages.push.apply(task.messages, data.message.split(/\n/g));
 
       if (task.messages.length > vm.settings.maxLogLine) {
-        task.messages.splice(0, vm.settings.maxLogLine - task.messages.length);
+        task.messages.splice(0, task.messages.length - vm.settings.maxLogLine);
       }
 
       store.set('openingTasks', vm.openingTasks);
@@ -202,8 +208,6 @@ new Vue({
     // 运行任务
     runTask: function (id) {
       mp.emit('run', { id: id });
-      // 清空之前的输出
-      _.find(this.openingTasks, { id: id }).messages = [];
     },
     // 杀掉进程
     killTask: function (pid) {

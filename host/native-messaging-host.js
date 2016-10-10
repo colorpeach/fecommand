@@ -130,6 +130,10 @@ function spawnTask (id, api) {
     message: ''
   }
 
+  task.pid = worker.pid;
+
+  api.emit('onProcessStart', passData);
+
   // 设置编码
   worker.stdout.setEncoding('utf8');
 
@@ -145,6 +149,12 @@ function spawnTask (id, api) {
     passData.status = 'running';
     passData.message = data + '\n';
     api.emit('onProcessRunning', passData);
+
+    task.messages.push.apply(task.messages, data.split(/\n/g));
+
+    if (task.messages.length > settings.maxLogLine) {
+      task.messages.splice(0, task.messages.length - settings.maxLogLine);
+    }
   }
 
   // 任务结束
@@ -223,7 +233,23 @@ var api = new NativeMessagingAPI();
 var projects = [];
 var openingTasks = [];
 var taskMap = {};
+var settings = {};
 var inited = false;
+
+function kill (pid) {
+  // http://azimi.me/2014/12/31/kill-child_process-node-js.html
+  if (process.platform === 'win32') {
+    try {
+      exec('taskkill /pid ' + pid + ' /T /F');
+    } catch (e) {}
+  } else {
+    try {
+      if (!process.kill(pid)) {
+        process.kill(-pid);
+      }
+    } catch (e) {}
+  }
+}
 
 // 初始化
 api.on('pageInit', function (data, portId) {
@@ -231,6 +257,7 @@ api.on('pageInit', function (data, portId) {
     projects = data.projects;
     data.projects.forEach(initProject);
     openingTasks = data.openingTasks;
+    settings = data.settings;
     inited = true;
   }
   api.emit('init', { projects: projects, openingTasks: openingTasks, taskMap: taskMap }, portId);
@@ -273,21 +300,10 @@ api.on('run', function (data) {
   spawnTask(data.id, api);
 });
 
-// // 杀掉进程
+// 杀掉进程
 api.on('kill', function (data) {
   // 杀掉进程组
-  // http://azimi.me/2014/12/31/kill-child_process-node-js.html
-  if (process.platform === 'win32') {
-    try {
-		exec('taskkill /pid ' + data.pid + ' /T /F');
-    } catch (e) {}
-  } else {
-    try {
-      if (!process.kill(data.pid)) {
-        process.kill(-data.pid);
-      }
-    } catch (e) {}
-  }
+  kill(data.pid);
 });
 
 process.stdin.on('readable', function() {
@@ -297,11 +313,7 @@ process.stdin.on('readable', function() {
 // 退出时，通知背景页
 process.on('exit', function (code) {
   openingTasks.forEach(function (task) {
-    try {
-      if (!process.kill(task.pid)) {
-        process.kill(-task.pid);
-      }
-    } catch (e) {}
+    kill(data.pid);
   });
   api.emit('nativeError', { code: code });
 });
