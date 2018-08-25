@@ -1,5 +1,7 @@
 # 前端命令可视化工具
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/colorpeach/fecommand.svg)](https://greenkeeper.io/)
+
 描述：
 
 能够自动收集项目中的`npm, gulp, fis`等命令，也可以自行添加npm相关命令（通过npm install安装的包提供的命令）
